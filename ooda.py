@@ -269,11 +269,15 @@ Only output files that need to be created or modified. Use paths relative to the
 def run_tests(cfg: dict) -> tuple[bool, str]:
     """Run the project's test suite. Returns (passed, output)."""
     test_cmd = cfg.get("test_command", "echo 'no tests configured'")
-    r = subprocess.run(
-        test_cmd, shell=True, cwd=cfg["project_dir"],
-        capture_output=True, text=True, timeout=300,
-    )
-    passed = r.returncode == 0
+    try:
+        r = subprocess.run(
+            test_cmd, shell=True, cwd=cfg["project_dir"],
+            capture_output=True, text=True, timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Tests timed out (300s)"
+    # pytest exit code 5 = no tests collected (not a failure)
+    passed = r.returncode in (0, 5)
     output = (r.stdout + "\n" + r.stderr).strip()
     return passed, output
 

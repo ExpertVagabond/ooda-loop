@@ -34,7 +34,7 @@ reviewer_endpoint: http://localhost:11434
 # review_model: "x-ai/grok-3-mini"
 
 # --- Test gate ---
-test_command: "python3 -m pytest -x --tb=short 2>&1 || echo 'no tests yet — pass'"
+test_command: "/usr/bin/python3 -m pytest -x --tb=short -p no:anchorpy"
 # test_command: "npm test"
 # test_command: "pytest -x"
 # test_command: "cargo test"
