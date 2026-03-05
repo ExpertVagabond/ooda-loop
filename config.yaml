@@ -1,0 +1,36 @@
+# OODA Loop Configuration
+# ========================
+
+# Target project to work on
+project_dir: "/Volumes/Virtual Server/projects/YOUR_PROJECT"
+
+# --- Coding Agent (inner loop) ---
+coding_agent:
+  # Options: codebuff, aider, ollama, custom
+  backend: codebuff
+  # For ollama backend:
+  # model: qwen2.5-coder:14b
+  # endpoint: http://localhost:11434
+  # For custom backend:
+  # command: "your-tool --prompt '{prompt}' --dir '{project_dir}'"
+
+# --- Reviewer (outer loop) ---
+# xAI Grok API (OpenAI-compatible)
+xai_api_key: "$XAI_API_KEY"
+review_api_base: "https://api.x.ai/v1"
+review_model: "grok-3-mini"
+
+# Or use OpenRouter for review:
+# review_api_base: "https://openrouter.ai/api/v1"
+# xai_api_key: "$OPENROUTER_API_KEY"
+# review_model: "x-ai/grok-3-mini"
+
+# --- Test gate ---
+test_command: "npm test"
+# test_command: "pytest -x"
+# test_command: "cargo test"
+
+# --- Loop controls ---
+max_attempts_per_task: 3   # retries per task before marking failed
+max_cycles: 20             # total loop iterations before stopping
+auto_push: false           # push to remote when all tasks done

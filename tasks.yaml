@@ -1,0 +1,14 @@
+# OODA Task Queue
+# ================
+# Tasks are processed in order. Grok can append new tasks during review.
+# Status: pending | running | done | failed
+
+- id: task-1
+  description: "Implement user authentication with JWT tokens"
+  context: "New Express.js API. Use bcrypt for password hashing. Store users in SQLite."
+  status: pending
+
+- id: task-2
+  description: "Add rate limiting middleware"
+  context: "Depends on task-1. Limit to 100 req/min per IP. Use express-rate-limit."
+  status: pending
