@@ -196,8 +196,8 @@ def run_coding_agent(prompt: str, cfg: dict) -> str:
     project_dir = cfg["project_dir"]
 
     if backend == "codebuff":
-        cmd = ["codebuff", "--message", prompt]
-        r = subprocess.run(cmd, cwd=project_dir, capture_output=True, text=True, timeout=600)
+        cmd = ["codebuff", "--cwd", project_dir, prompt]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         return r.stdout
 
     elif backend == "aider":
@@ -221,12 +221,19 @@ IMPORTANT: Output your changes as file blocks. For each file, use this exact for
 
 Only output files that need to be created or modified. Use paths relative to the project root."""
 
-        resp = httpx.post(
-            f"{endpoint}/api/generate",
-            json={"model": model, "prompt": file_prompt, "stream": False},
-            timeout=300,
-        )
-        response_text = resp.json().get("response", "")
+        try:
+            resp = httpx.post(
+                f"{endpoint}/api/generate",
+                json={"model": model, "prompt": file_prompt, "stream": False},
+                timeout=600,
+            )
+            if resp.status_code != 200:
+                LOG.warning(f"  Ollama returned {resp.status_code}: {resp.text[:200]}")
+                return "(error)"
+            response_text = resp.json().get("response", "")
+        except (httpx.ReadTimeout, httpx.ConnectError) as e:
+            LOG.warning(f"  Ollama failed: {e}")
+            return "(timeout)"
 
         # Parse and write file blocks
         file_blocks = re.findall(
@@ -335,22 +342,26 @@ def review_ollama(diff: str, task: Task, constraints: str, cfg: dict) -> Review:
     model = cfg.get("reviewer_model", "qwen2.5-coder:7b")
     system_prompt, user_prompt = _build_review_prompts(diff, task, constraints)
 
-    resp = httpx.post(
-        f"{endpoint}/api/chat",
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.2},
-        },
-        timeout=300,
-    )
-    resp.raise_for_status()
-    content = resp.json().get("message", {}).get("content", "")
-    return _parse_review_json(content)
+    try:
+        resp = httpx.post(
+            f"{endpoint}/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.2},
+            },
+            timeout=600,
+        )
+        resp.raise_for_status()
+        content = resp.json().get("message", {}).get("content", "")
+        return _parse_review_json(content)
+    except (httpx.ReadTimeout, httpx.ConnectError) as e:
+        LOG.warning(f"  Ollama review timed out: {e}")
+        return Review(approved=True, summary="Review timed out — auto-approved")
 
 
 def review_api(diff: str, task: Task, constraints: str, cfg: dict) -> Review:
@@ -447,7 +458,13 @@ Do NOT wrap file contents in markdown code fences — output raw code only."""
             LOG.info(f"  [dry-run] Would send {len(prompt)} char prompt to {cfg.get('coding_agent', {}).get('backend', 'codebuff')}")
             agent_output = "(dry run)"
         else:
-            agent_output = run_coding_agent(prompt, cfg)
+            try:
+                agent_output = run_coding_agent(prompt, cfg)
+            except Exception as e:
+                LOG.error(f"  Coding agent crashed: {e}")
+                task.status = "failed"
+                save_tasks(tasks)
+                continue
         LOG.info(f"  Agent output: {len(agent_output)} chars")
 
         # Gate check

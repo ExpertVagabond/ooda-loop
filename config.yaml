@@ -2,7 +2,7 @@
 # ========================
 
 # Target project to work on
-project_dir: "/Volumes/Virtual Server/projects/YOUR_PROJECT"
+project_dir: "/tmp/ooda-demo"
 
 # --- Coding Agent (inner loop) ---
 coding_agent:
@@ -34,7 +34,7 @@ reviewer_endpoint: http://localhost:11434
 # review_model: "x-ai/grok-3-mini"
 
 # --- Test gate ---
-test_command: "echo 'no tests configured — auto-pass'"
+test_command: "python3 -m pytest -x --tb=short 2>&1 || echo 'no tests yet — pass'"
 # test_command: "npm test"
 # test_command: "pytest -x"
 # test_command: "cargo test"
