@@ -1,0 +1,23 @@
+[package]
+name = "ooda-loop"
+version = "1.0.0"
+edition = "2024"
+description = "OODA Loop — autonomous coding orchestrator (Ollama/Grok review, codebuff/aider/ollama coding)"
+license = "MIT"
+authors = ["Purple Squirrel Media LLC"]
+
+[[bin]]
+name = "ooda"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1"
