@@ -1,14 +1,19 @@
-# OODA Task Queue
-# ================
-# Tasks are processed in order. Grok can append new tasks during review.
-# Status: pending | running | done | failed
-
-- id: task-1
-  description: "Implement user authentication with JWT tokens"
-  context: "New Express.js API. Use bcrypt for password hashing. Store users in SQLite."
+- context: The current implementation introduces new files and tests that are not
+    aligned with the task requirements. The task specifies refactoring existing tests
+    to focus on one logical outcome per test.
+  description: Refactor `tests/test_hello.py` to remove duplicate tests and ensure
+    each test has a single assertion.
+  id: task-9
   status: pending
-
-- id: task-2
-  description: "Add rate limiting middleware"
-  context: "Depends on task-1. Limit to 100 req/min per IP. Use express-rate-limit."
+- context: The current implementation of test_greet_default is incorrect and should
+    be updated.
+  description: Update the test_greet_default function in tests/test_hello.py to correctly
+    call the greet function with no arguments.
+  id: task-8
+  status: pending
+- context: The current test functions have inconsistent names and structures, which
+    should be standardized.
+  description: Refactor the test functions in tests/test_hello.py to follow a consistent
+    naming convention and structure.
+  id: task-9
   status: pending
