@@ -72,6 +72,14 @@ def load_constraints(constraints_dir: Path = ROOT / "constraints") -> str:
 
 
 def load_tasks(path: Path = ROOT / "tasks.yaml") -> list[Task]:
+    if not path.exists():
+        example = path.with_suffix(".example.yaml")
+        if example.exists():
+            import shutil
+            shutil.copy(example, path)
+            LOG.info(f"Created {path.name} from {example.name}")
+        else:
+            return []
     with open(path) as f:
         raw = yaml.safe_load(f) or []
     return [Task(**t) for t in raw if t.get("status", "pending") == "pending"]
