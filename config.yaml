@@ -8,7 +8,7 @@ project_dir: "/tmp/ooda-demo"
 coding_agent:
   # Options: codebuff, aider, ollama, custom
   backend: ollama
-  model: qwen2.5-coder:7b
+  model: qwen2.5-coder:14b
   endpoint: http://localhost:11434
   # For codebuff: backend: codebuff
   # For aider:    backend: aider
@@ -18,7 +18,7 @@ coding_agent:
 # --- Reviewer (outer loop) ---
 # Options: "api" (Grok/OpenRouter) or "ollama" (fully local)
 reviewer: ollama
-reviewer_model: qwen2.5-coder:7b
+reviewer_model: qwen2.5-coder:14b
 reviewer_endpoint: http://localhost:11434
 
 # For Grok via xAI API:

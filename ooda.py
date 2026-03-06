@@ -128,6 +128,24 @@ def git_push(project_dir: str) -> bool:
     r = subprocess.run(["git", "push"], cwd=project_dir, capture_output=True, text=True)
     return r.returncode == 0
 
+
+def git_snapshot(project_dir: str) -> None:
+    """Create a lightweight snapshot so we can revert failed coding attempts."""
+    subprocess.run(["git", "add", "-A"], cwd=project_dir, capture_output=True)
+    subprocess.run(
+        ["git", "stash", "push", "-m", "ooda-snapshot", "--include-untracked"],
+        cwd=project_dir, capture_output=True,
+    )
+    # Immediately restore — the stash entry stays as our rollback point
+    subprocess.run(["git", "stash", "pop"], cwd=project_dir, capture_output=True)
+
+
+def git_rollback(project_dir: str) -> None:
+    """Revert working tree to the last commit (undo a failed coding attempt)."""
+    subprocess.run(["git", "checkout", "."], cwd=project_dir, capture_output=True)
+    subprocess.run(["git", "clean", "-fd"], cwd=project_dir, capture_output=True)
+    subprocess.run(["git", "reset", "HEAD"], cwd=project_dir, capture_output=True)
+
 # ---------------------------------------------------------------------------
 # Codebase context
 # ---------------------------------------------------------------------------
@@ -213,19 +231,36 @@ def run_coding_agent(prompt: str, cfg: dict) -> str:
         # Ask the model to produce file contents with clear delimiters
         file_prompt = f"""{prompt}
 
-IMPORTANT: Output your changes as file blocks. For each file, use this exact format:
+IMPORTANT: Output your changes using ONE of these two formats:
 
+FORMAT 1 — For NEW files (files that don't exist yet):
 ===FILE: path/to/file.ext===
-<file contents>
+<complete file contents>
 ===END===
 
-Only output files that need to be created or modified. Use paths relative to the project root."""
+FORMAT 2 — For MODIFYING existing files (adding code to a file that already exists):
+===APPEND: path/to/file.ext===
+<code to add at the end of the file>
+===END===
+
+Or to add imports at the top:
+===PREPEND: path/to/file.ext===
+<imports or code to add at the top>
+===END===
+
+CRITICAL RULES:
+- For existing files, ALWAYS use APPEND/PREPEND — never rewrite the whole file.
+- For new files, use the FILE format with the complete contents.
+- Ensure every function/class you use is imported.
+- If existing tests already pass, do NOT rewrite them.
+- Use paths relative to the project root.
+- Do NOT wrap code in markdown fences."""
 
         try:
             resp = httpx.post(
                 f"{endpoint}/api/generate",
                 json={"model": model, "prompt": file_prompt, "stream": False},
-                timeout=600,
+                timeout=1200,
             )
             if resp.status_code != 200:
                 LOG.warning(f"  Ollama returned {resp.status_code}: {resp.text[:200]}")
@@ -235,20 +270,27 @@ Only output files that need to be created or modified. Use paths relative to the
             LOG.warning(f"  Ollama failed: {e}")
             return "(timeout)"
 
-        # Parse and write file blocks
-        file_blocks = re.findall(
-            r"===FILE:\s*(.+?)===\n(.*?)===END===",
-            response_text,
-            re.DOTALL,
-        )
-        for rel_path, content in file_blocks:
-            rel_path = rel_path.strip()
-            # Strip markdown code fences that small models love to add
+        # Parse and write file blocks (FILE = replace, APPEND = add to end, PREPEND = add to top)
+        for match in re.finditer(
+            r"===(FILE|APPEND|PREPEND):\s*(.+?)===\n(.*?)===END===",
+            response_text, re.DOTALL,
+        ):
+            mode, rel_path, content = match.group(1), match.group(2).strip(), match.group(3)
             content = _strip_markdown_fences(content)
             target = Path(project_dir) / rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
-            LOG.info(f"    Wrote: {rel_path}")
+
+            if mode == "APPEND" and target.exists():
+                existing = target.read_text()
+                target.write_text(existing.rstrip("\n") + "\n\n" + content)
+                LOG.info(f"    Appended to: {rel_path}")
+            elif mode == "PREPEND" and target.exists():
+                existing = target.read_text()
+                target.write_text(content.rstrip("\n") + "\n" + existing)
+                LOG.info(f"    Prepended to: {rel_path}")
+            else:
+                target.write_text(content)
+                LOG.info(f"    Wrote: {rel_path}")
 
         return response_text
 
@@ -458,6 +500,10 @@ Do NOT wrap file contents in markdown code fences — output raw code only."""
         LOG.info("  ORIENT — applying constraints")
         LOG.info("  DECIDE + ACT — running coding agent")
 
+        # Snapshot working tree so we can rollback if tests fail
+        if not dry_run:
+            git_snapshot(project_dir)
+
         if dry_run:
             LOG.info(f"  [dry-run] Would send {len(prompt)} char prompt to {cfg.get('coding_agent', {}).get('backend', 'codebuff')}")
             agent_output = "(dry run)"
@@ -479,6 +525,13 @@ Do NOT wrap file contents in markdown code fences — output raw code only."""
 
         if not passed:
             LOG.warning(f"  Tests FAILED (attempt {task.attempts}/{max_attempts})")
+            # Log first 500 chars of test output for debugging
+            for line in test_output[:500].split("\n"):
+                LOG.info(f"    | {line}")
+            # Rollback broken changes so next attempt starts clean
+            if not dry_run:
+                git_rollback(project_dir)
+                LOG.info("  Rolled back to clean state")
             if task.attempts < max_attempts:
                 task.context += f"\n\nPrevious attempt failed tests:\n{test_output[:2000]}"
                 task.status = "pending"
@@ -510,6 +563,10 @@ Do NOT wrap file contents in markdown code fences — output raw code only."""
                 git_stage_commit(project_dir, f"ooda: {task.id} — {task.description[:60]}")
             LOG.info(f"  {'[dry-run] Would commit' if dry_run else 'Committed'}: {task.id}")
         else:
+            # Rollback unapproved changes — fix tasks will start clean
+            if not dry_run:
+                git_rollback(project_dir)
+                LOG.info("  Rolled back unapproved changes")
             for nt in review.new_tasks:
                 tasks.append(Task(
                     id=nt.get("id", f"fix-{cycle}"),
