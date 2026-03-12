@@ -6,9 +6,10 @@ project_dir: "/tmp/ooda-demo"
 
 # --- Coding Agent (inner loop) ---
 coding_agent:
-  # Options: codebuff, aider, ollama, custom
+  # Options: codebuff, aider, ollama, ollama-fim, custom
   backend: ollama
-  model: qwen2.5-coder:14b
+  model: qwen2.5-coder:14b         # complex tasks (14b)
+  model_simple: qwen2.5-coder:7b   # simple tasks (7b, 2x faster)
   endpoint: http://localhost:11434
   # For codebuff: backend: codebuff
   # For aider:    backend: aider
@@ -16,10 +17,15 @@ coding_agent:
   #               command: "your-tool --prompt '{prompt}' --dir '{project_dir}'"
 
 # --- Reviewer (outer loop) ---
-# Options: "api" (Grok/OpenRouter) or "ollama" (fully local)
+# Options: "claude" (Anthropic), "api" (Grok/OpenRouter), "ollama" (fully local)
 reviewer: ollama
 reviewer_model: qwen2.5-coder:14b
 reviewer_endpoint: http://localhost:11434
+
+# For Claude (needs Anthropic API credits):
+# reviewer: claude
+# reviewer_model: claude-sonnet-4-20250514
+# anthropic_api_key: "$ANTHROPIC_API_KEY"
 
 # For Grok via xAI API:
 # reviewer: api

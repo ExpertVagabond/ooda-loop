@@ -1,0 +1,8 @@
+/Volumes/Virtual Server/projects/ooda-loop/target/debug/deps/icu_normalizer-02fff7f062b995dc.d: /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/lib.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/properties.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/provider.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/uts46.rs
+
+/Volumes/Virtual Server/projects/ooda-loop/target/debug/deps/libicu_normalizer-02fff7f062b995dc.rmeta: /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/lib.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/properties.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/provider.rs /Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/uts46.rs
+
+/Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/lib.rs:
+/Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/properties.rs:
+/Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/provider.rs:
+/Volumes/Virtual\ Server/configs/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.1.1/src/uts46.rs:
