@@ -46,7 +46,9 @@ struct Task {
     attempts: u32,
 }
 
-fn default_pending() -> String { "pending".into() }
+fn default_pending() -> String {
+    "pending".into()
+}
 
 #[derive(Debug)]
 struct Review {
@@ -86,13 +88,27 @@ struct Config {
     review_model: String,
 }
 
-fn default_max_attempts() -> u32 { 3 }
-fn default_max_cycles() -> u32 { 20 }
-fn default_reviewer() -> String { "ollama".into() }
-fn default_ollama_endpoint() -> String { "http://localhost:11434".into() }
-fn default_reviewer_model() -> String { "qwen2.5-coder:7b".into() }
-fn default_xai_base() -> String { "https://api.x.ai/v1".into() }
-fn default_review_model() -> String { "grok-3-mini".into() }
+fn default_max_attempts() -> u32 {
+    3
+}
+fn default_max_cycles() -> u32 {
+    20
+}
+fn default_reviewer() -> String {
+    "ollama".into()
+}
+fn default_ollama_endpoint() -> String {
+    "http://localhost:11434".into()
+}
+fn default_reviewer_model() -> String {
+    "qwen2.5-coder:7b".into()
+}
+fn default_xai_base() -> String {
+    "https://api.x.ai/v1".into()
+}
+fn default_review_model() -> String {
+    "grok-3-mini".into()
+}
 
 #[derive(Debug, Deserialize, Default)]
 struct CodingAgent {
@@ -106,7 +122,9 @@ struct CodingAgent {
     command: String,
 }
 
-fn default_backend() -> String { "codebuff".into() }
+fn default_backend() -> String {
+    "codebuff".into()
+}
 
 fn root_dir() -> PathBuf {
     std::env::current_exe()
@@ -116,21 +134,18 @@ fn root_dir() -> PathBuf {
 }
 
 fn load_config() -> Config {
-    let paths = [
-        PathBuf::from("config.yaml"),
-        root_dir().join("config.yaml"),
-    ];
+    let paths = [PathBuf::from("config.yaml"), root_dir().join("config.yaml")];
     for p in &paths {
-        if p.exists() {
-            if let Ok(text) = std::fs::read_to_string(p) {
-                if let Ok(mut cfg) = serde_yaml::from_str::<Config>(&text) {
-                    // Resolve env vars for API keys
-                    if cfg.xai_api_key.starts_with('$') {
-                        cfg.xai_api_key = std::env::var(cfg.xai_api_key.trim_start_matches('$')).unwrap_or_default();
-                    }
-                    return cfg;
-                }
+        if p.exists()
+            && let Ok(text) = std::fs::read_to_string(p)
+            && let Ok(mut cfg) = serde_yaml::from_str::<Config>(&text)
+        {
+            // Resolve env vars for API keys
+            if cfg.xai_api_key.starts_with('$') {
+                cfg.xai_api_key =
+                    std::env::var(cfg.xai_api_key.trim_start_matches('$')).unwrap_or_default();
             }
+            return cfg;
         }
     }
     Config {
@@ -162,7 +177,10 @@ fn load_tasks() -> Vec<Task> {
     }
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let tasks: Vec<Task> = serde_yaml::from_str(&text).unwrap_or_default();
-    tasks.into_iter().filter(|t| t.status == "pending").collect()
+    tasks
+        .into_iter()
+        .filter(|t| t.status == "pending")
+        .collect()
 }
 
 fn save_tasks(tasks: &[Task]) {
@@ -172,18 +190,24 @@ fn save_tasks(tasks: &[Task]) {
 
 fn load_constraints() -> String {
     let dir = PathBuf::from("constraints");
-    if !dir.exists() { return String::new(); }
+    if !dir.exists() {
+        return String::new();
+    }
     let mut parts = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&dir) {
         let mut files: Vec<_> = entries.filter_map(|e| e.ok()).collect();
         files.sort_by_key(|e| e.file_name());
         for entry in files {
             let p = entry.path();
-            if p.extension().and_then(|e| e.to_str()) == Some("md") {
-                if let Ok(text) = std::fs::read_to_string(&p) {
-                    let name = p.file_stem().unwrap_or_default().to_string_lossy().to_uppercase();
-                    parts.push(format!("# {name}\n\n{text}"));
-                }
+            if p.extension().and_then(|e| e.to_str()) == Some("md")
+                && let Ok(text) = std::fs::read_to_string(&p)
+            {
+                let name = p
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_uppercase();
+                parts.push(format!("# {name}\n\n{text}"));
             }
         }
     }
@@ -192,14 +216,25 @@ fn load_constraints() -> String {
 
 // Git helpers
 fn git_diff(project_dir: &str) -> String {
-    let _ = Command::new("git").args(["add", "-A"]).current_dir(project_dir).output();
-    let out = Command::new("git").args(["diff", "--cached"]).current_dir(project_dir).output();
+    let _ = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(project_dir)
+        .output();
+    let out = Command::new("git")
+        .args(["diff", "--cached"])
+        .current_dir(project_dir)
+        .output();
     match out {
         Ok(o) => {
             let diff = String::from_utf8_lossy(&o.stdout).trim().to_string();
             if diff.is_empty() {
-                let status = Command::new("git").args(["status", "--porcelain"]).current_dir(project_dir).output();
-                status.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_else(|_| "(no changes)".into())
+                let status = Command::new("git")
+                    .args(["status", "--porcelain"])
+                    .current_dir(project_dir)
+                    .output();
+                status
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .unwrap_or_else(|_| "(no changes)".into())
             } else {
                 diff
             }
@@ -209,20 +244,43 @@ fn git_diff(project_dir: &str) -> String {
 }
 
 fn git_commit(project_dir: &str, message: &str) -> bool {
-    let _ = Command::new("git").args(["add", "-A"]).current_dir(project_dir).output();
-    Command::new("git").args(["commit", "-m", message]).current_dir(project_dir).output().map(|o| o.status.success()).unwrap_or(false)
+    let _ = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(project_dir)
+        .output();
+    Command::new("git")
+        .args(["commit", "-m", message])
+        .current_dir(project_dir)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 fn git_push(project_dir: &str) -> bool {
-    Command::new("git").args(["push"]).current_dir(project_dir).output().map(|o| o.status.success()).unwrap_or(false)
+    Command::new("git")
+        .args(["push"])
+        .current_dir(project_dir)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 // Project context
 fn get_project_context(project_dir: &str, max_chars: usize) -> String {
-    let out = Command::new("find").args([".", "-not", "-path", "./.git/*", "-type", "f"]).current_dir(project_dir).output();
-    let files: Vec<String> = out.map(|o| {
-        String::from_utf8_lossy(&o.stdout).trim().split('\n').map(|s| s.to_string()).filter(|s| !s.is_empty()).collect()
-    }).unwrap_or_default();
+    let out = Command::new("find")
+        .args([".", "-not", "-path", "./.git/*", "-type", "f"])
+        .current_dir(project_dir)
+        .output();
+    let files: Vec<String> = out
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .trim()
+                .split('\n')
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
 
     let mut parts = Vec::new();
     let mut total = 0;
@@ -232,22 +290,32 @@ fn get_project_context(project_dir: &str, max_chars: usize) -> String {
         parts.push(tree);
     }
 
-    let code_exts = ["py","js","ts","rs","rb","go","java","c","h","yaml","json","toml"];
+    let code_exts = [
+        "py", "js", "ts", "rs", "rb", "go", "java", "c", "h", "yaml", "json", "toml",
+    ];
     for f in &files {
         let p = Path::new(project_dir).join(f.trim_start_matches("./"));
         let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if !code_exts.contains(&ext) || !p.is_file() { continue; }
+        if !code_exts.contains(&ext) || !p.is_file() {
+            continue;
+        }
         let content = match std::fs::read_to_string(&p) {
             Ok(c) if c.len() <= 2000 => c,
             _ => continue,
         };
         let block = format!("\n## {f}\n```\n{content}\n```");
-        if total + block.len() > max_chars { break; }
+        if total + block.len() > max_chars {
+            break;
+        }
         total += block.len();
         parts.push(block);
     }
 
-    if parts.is_empty() { "(empty project)".into() } else { parts.join("\n") }
+    if parts.is_empty() {
+        "(empty project)".into()
+    } else {
+        parts.join("\n")
+    }
 }
 
 fn strip_fences(text: &str) -> String {
@@ -255,7 +323,11 @@ fn strip_fences(text: &str) -> String {
     if trimmed.starts_with("```") {
         let lines: Vec<&str> = trimmed.lines().collect();
         let start = 1;
-        let end = if lines.last().map(|l| l.trim()) == Some("```") { lines.len() - 1 } else { lines.len() };
+        let end = if lines.last().map(|l| l.trim()) == Some("```") {
+            lines.len() - 1
+        } else {
+            lines.len()
+        };
         lines[start..end].join("\n") + "\n"
     } else {
         trimmed.to_string() + "\n"
@@ -267,21 +339,33 @@ fn run_coding_agent(prompt: &str, cfg: &Config) -> String {
     let project_dir = &cfg.project_dir;
     match cfg.coding_agent.backend.as_str() {
         "codebuff" => {
-            let out = Command::new("codebuff").args(["--message", prompt]).current_dir(project_dir).output();
-            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default()
+            let out = Command::new("codebuff")
+                .args(["--message", prompt])
+                .current_dir(project_dir)
+                .output();
+            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                .unwrap_or_default()
         }
         "aider" => {
-            let out = Command::new("aider").args(["--message", prompt, "--yes-always", "--no-git"]).current_dir(project_dir).output();
-            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default()
+            let out = Command::new("aider")
+                .args(["--message", prompt, "--yes-always", "--no-git"])
+                .current_dir(project_dir)
+                .output();
+            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                .unwrap_or_default()
         }
         "ollama" => {
-            let file_prompt = format!("{prompt}\n\nIMPORTANT: Output your changes as file blocks. For each file, use this exact format:\n\n===FILE: path/to/file.ext===\n<file contents>\n===END===\n\nOnly output files that need to be created or modified.");
+            let file_prompt = format!(
+                "{prompt}\n\nIMPORTANT: Output your changes as file blocks. For each file, use this exact format:\n\n===FILE: path/to/file.ext===\n<file contents>\n===END===\n\nOnly output files that need to be created or modified."
+            );
             let client = reqwest::blocking::Client::new();
             let resp = client.post(format!("{}/api/generate", cfg.coding_agent.endpoint))
                 .json(&json!({"model": cfg.coding_agent.model, "prompt": file_prompt, "stream": false}))
                 .timeout(std::time::Duration::from_secs(300))
                 .send();
-            let response_text = resp.ok().and_then(|r| r.json::<serde_json::Value>().ok())
+            let response_text = resp
+                .ok()
+                .and_then(|r| r.json::<serde_json::Value>().ok())
                 .and_then(|v| v["response"].as_str().map(|s| s.to_string()))
                 .unwrap_or_default();
 
@@ -299,9 +383,17 @@ fn run_coding_agent(prompt: &str, cfg: &Config) -> String {
             response_text
         }
         "custom" => {
-            let cmd_str = cfg.coding_agent.command.replace("{prompt}", prompt).replace("{project_dir}", project_dir);
-            let out = Command::new("sh").args(["-c", &cmd_str]).current_dir(project_dir).output();
-            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default()
+            let cmd_str = cfg
+                .coding_agent
+                .command
+                .replace("{prompt}", prompt)
+                .replace("{project_dir}", project_dir);
+            let out = Command::new("sh")
+                .args(["-c", &cmd_str])
+                .current_dir(project_dir)
+                .output();
+            out.map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                .unwrap_or_default()
         }
         other => {
             info!("Unknown backend: {other}");
@@ -311,10 +403,19 @@ fn run_coding_agent(prompt: &str, cfg: &Config) -> String {
 }
 
 fn run_tests(cfg: &Config) -> (bool, String) {
-    let out = Command::new("sh").args(["-c", &cfg.test_command]).current_dir(&cfg.project_dir).output();
+    let out = Command::new("sh")
+        .args(["-c", &cfg.test_command])
+        .current_dir(&cfg.project_dir)
+        .output();
     match out {
         Ok(o) => {
-            let text = format!("{}\n{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)).trim().to_string();
+            let text = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr)
+            )
+            .trim()
+            .to_string();
             (o.status.success(), text)
         }
         Err(e) => (false, format!("test exec failed: {e}")),
@@ -325,8 +426,11 @@ fn run_tests(cfg: &Config) -> (bool, String) {
 fn parse_review_json(content: &str) -> Review {
     let trimmed = content.trim();
     let text = if trimmed.starts_with("```") {
-        let inner = trimmed.splitn(2, '\n').nth(1).unwrap_or(trimmed);
-        inner.rsplit_once("```").map(|(left, _)| left).unwrap_or(inner)
+        let inner = trimmed.split_once('\n').map(|x| x.1).unwrap_or(trimmed);
+        inner
+            .rsplit_once("```")
+            .map(|(left, _)| left)
+            .unwrap_or(inner)
     } else {
         trimmed
     };
@@ -334,36 +438,65 @@ fn parse_review_json(content: &str) -> Review {
     let json_str = re.find(text).map(|m| m.as_str()).unwrap_or("{}");
     match serde_json::from_str::<serde_json::Value>(json_str) {
         Ok(v) => {
-            let new_tasks: Vec<Task> = v["new_tasks"].as_array().map(|a| {
-                a.iter().map(|t| Task {
-                    id: t["id"].as_str().unwrap_or("fix").to_string(),
-                    description: t["description"].as_str().unwrap_or("Fix issues").to_string(),
-                    context: t["context"].as_str().unwrap_or("").to_string(),
-                    status: "pending".into(),
-                    attempts: 0,
-                }).collect()
-            }).unwrap_or_default();
+            let new_tasks: Vec<Task> = v["new_tasks"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .map(|t| Task {
+                            id: t["id"].as_str().unwrap_or("fix").to_string(),
+                            description: t["description"]
+                                .as_str()
+                                .unwrap_or("Fix issues")
+                                .to_string(),
+                            context: t["context"].as_str().unwrap_or("").to_string(),
+                            status: "pending".into(),
+                            attempts: 0,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             Review {
                 approved: v["approved"].as_bool().unwrap_or(false),
                 summary: v["summary"].as_str().unwrap_or("").to_string(),
-                issues: v["issues"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()).unwrap_or_default(),
+                issues: v["issues"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 new_tasks,
             }
         }
-        Err(_) => Review { approved: true, summary: "Parse failed — auto-approved".into(), issues: vec![], new_tasks: vec![] },
+        Err(_) => Review {
+            approved: true,
+            summary: "Parse failed — auto-approved".into(),
+            issues: vec![],
+            new_tasks: vec![],
+        },
     }
 }
 
 fn build_review_prompts(diff: &str, task: &Task, constraints: &str) -> (String, String) {
-    let system = format!("You are a senior code reviewer. Review this diff against the task spec.\nApply these constraints:\n\n{constraints}\n\nRespond with ONLY valid JSON:\n{{\"approved\": true/false, \"summary\": \"brief review\", \"issues\": [\"issue1\"], \"new_tasks\": [{{\"id\": \"task-N\", \"description\": \"what\", \"context\": \"why\"}}]}}\n\nIf complete and correct, set approved=true and new_tasks=[].");
-    let user = format!("## Task\nID: {}\nDescription: {}\nContext: {}\n\n## Diff\n```\n{}\n```", task.id, task.description, task.context, &diff[..diff.len().min(12000)]);
+    let system = format!(
+        "You are a senior code reviewer. Review this diff against the task spec.\nApply these constraints:\n\n{constraints}\n\nRespond with ONLY valid JSON:\n{{\"approved\": true/false, \"summary\": \"brief review\", \"issues\": [\"issue1\"], \"new_tasks\": [{{\"id\": \"task-N\", \"description\": \"what\", \"context\": \"why\"}}]}}\n\nIf complete and correct, set approved=true and new_tasks=[]."
+    );
+    let user = format!(
+        "## Task\nID: {}\nDescription: {}\nContext: {}\n\n## Diff\n```\n{}\n```",
+        task.id,
+        task.description,
+        task.context,
+        &diff[..diff.len().min(12000)]
+    );
     (system, user)
 }
 
 fn review_ollama(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Review {
     let (system, user) = build_review_prompts(diff, task, constraints);
     let client = reqwest::blocking::Client::new();
-    let resp = client.post(format!("{}/api/chat", cfg.reviewer_endpoint))
+    let resp = client
+        .post(format!("{}/api/chat", cfg.reviewer_endpoint))
         .json(&json!({
             "model": cfg.reviewer_model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -371,7 +504,9 @@ fn review_ollama(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Re
         }))
         .timeout(std::time::Duration::from_secs(300))
         .send();
-    let content = resp.ok().and_then(|r| r.json::<serde_json::Value>().ok())
+    let content = resp
+        .ok()
+        .and_then(|r| r.json::<serde_json::Value>().ok())
         .and_then(|v| v["message"]["content"].as_str().map(|s| s.to_string()))
         .unwrap_or_default();
     parse_review_json(&content)
@@ -379,11 +514,17 @@ fn review_ollama(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Re
 
 fn review_api(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Review {
     if cfg.xai_api_key.is_empty() {
-        return Review { approved: true, summary: "No reviewer API key".into(), issues: vec![], new_tasks: vec![] };
+        return Review {
+            approved: true,
+            summary: "No reviewer API key".into(),
+            issues: vec![],
+            new_tasks: vec![],
+        };
     }
     let (system, user) = build_review_prompts(diff, task, constraints);
     let client = reqwest::blocking::Client::new();
-    let resp = client.post(format!("{}/chat/completions", cfg.review_api_base))
+    let resp = client
+        .post(format!("{}/chat/completions", cfg.review_api_base))
         .header("Authorization", format!("Bearer {}", cfg.xai_api_key))
         .json(&json!({
             "model": cfg.review_model,
@@ -392,8 +533,14 @@ fn review_api(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Revie
         }))
         .timeout(std::time::Duration::from_secs(120))
         .send();
-    let content = resp.ok().and_then(|r| r.json::<serde_json::Value>().ok())
-        .and_then(|v| v["choices"][0]["message"]["content"].as_str().map(|s| s.to_string()))
+    let content = resp
+        .ok()
+        .and_then(|r| r.json::<serde_json::Value>().ok())
+        .and_then(|v| {
+            v["choices"][0]["message"]["content"]
+                .as_str()
+                .map(|s| s.to_string())
+        })
         .unwrap_or_default();
     parse_review_json(&content)
 }
@@ -404,7 +551,12 @@ fn run_review(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Revie
         "api" => review_api(diff, task, constraints, cfg),
         other => {
             info!("Unknown reviewer '{other}' — auto-approving");
-            Review { approved: true, summary: format!("Unknown: {other}"), issues: vec![], new_tasks: vec![] }
+            Review {
+                approved: true,
+                summary: format!("Unknown: {other}"),
+                issues: vec![],
+                new_tasks: vec![],
+            }
         }
     }
 }
@@ -418,8 +570,14 @@ fn ooda_run(cfg: Config) {
     let dry_run = cfg.dry_run;
     let mut cycle = 0u32;
 
-    info!("OODA Loop starting — {} tasks, project: {}", tasks.len(), cfg.project_dir);
-    if dry_run { info!("DRY RUN — no code will be written"); }
+    info!(
+        "OODA Loop starting — {} tasks, project: {}",
+        tasks.len(),
+        cfg.project_dir
+    );
+    if dry_run {
+        info!("DRY RUN — no code will be written");
+    }
 
     while !tasks.is_empty() && cycle < max_cycles {
         cycle += 1;
@@ -440,7 +598,11 @@ fn ooda_run(cfg: Config) {
 
         info!("  ORIENT + DECIDE + ACT — running coding agent");
         let agent_output = if dry_run {
-            info!("  [dry-run] Would send {} char prompt to {}", prompt.len(), cfg.coding_agent.backend);
+            info!(
+                "  [dry-run] Would send {} char prompt to {}",
+                prompt.len(),
+                cfg.coding_agent.backend
+            );
             "(dry run)".to_string()
         } else {
             run_coding_agent(&prompt, &cfg)
@@ -448,10 +610,17 @@ fn ooda_run(cfg: Config) {
         info!("  Agent output: {} chars", agent_output.len());
 
         // Test gate
-        let (passed, test_output) = if dry_run { (true, "(dry run)".into()) } else { run_tests(&cfg) };
+        let (passed, test_output) = if dry_run {
+            (true, "(dry run)".into())
+        } else {
+            run_tests(&cfg)
+        };
 
         if !passed {
-            info!("  Tests FAILED (attempt {}/{})", task.attempts, max_attempts);
+            info!(
+                "  Tests FAILED (attempt {}/{})",
+                task.attempts, max_attempts
+            );
             if task.attempts < max_attempts {
                 let truncated = &test_output[..test_output.len().min(2000)];
                 task.context += &format!("\n\nPrevious attempt failed tests:\n{truncated}");
@@ -470,14 +639,30 @@ fn ooda_run(cfg: Config) {
 
         // Review
         let (_diff, review) = if dry_run {
-            ("(dry run)".to_string(), Review { approved: true, summary: "Dry run".into(), issues: vec![], new_tasks: vec![] })
+            (
+                "(dry run)".to_string(),
+                Review {
+                    approved: true,
+                    summary: "Dry run".into(),
+                    issues: vec![],
+                    new_tasks: vec![],
+                },
+            )
         } else {
             let d = git_diff(&cfg.project_dir);
             let r = run_review(&d, &task, &constraints, &cfg);
             (d, r)
         };
 
-        info!("  Review: {} — {}", if review.approved { "APPROVED" } else { "NEEDS WORK" }, review.summary);
+        info!(
+            "  Review: {} — {}",
+            if review.approved {
+                "APPROVED"
+            } else {
+                "NEEDS WORK"
+            },
+            review.summary
+        );
         for issue in &review.issues {
             info!("    - {issue}");
         }
@@ -485,10 +670,22 @@ fn ooda_run(cfg: Config) {
         if review.approved {
             task.status = "done".into();
             if !dry_run {
-                let msg = format!("ooda: {} — {}", task.id, &task.description[..task.description.len().min(60)]);
+                let msg = format!(
+                    "ooda: {} — {}",
+                    task.id,
+                    &task.description[..task.description.len().min(60)]
+                );
                 git_commit(&cfg.project_dir, &msg);
             }
-            info!("  {}: {}", if dry_run { "[dry-run] Would commit" } else { "Committed" }, task.id);
+            info!(
+                "  {}: {}",
+                if dry_run {
+                    "[dry-run] Would commit"
+                } else {
+                    "Committed"
+                },
+                task.id
+            );
         } else {
             for nt in review.new_tasks {
                 tasks.push(nt);
@@ -500,12 +697,13 @@ fn ooda_run(cfg: Config) {
     }
 
     let remaining: Vec<_> = tasks.iter().filter(|t| t.status == "pending").collect();
-    if remaining.is_empty() && cfg.auto_push && !dry_run {
-        if git_push(&cfg.project_dir) {
-            info!("Pushed to remote");
-        }
+    if remaining.is_empty() && cfg.auto_push && !dry_run && git_push(&cfg.project_dir) {
+        info!("Pushed to remote");
     }
-    info!("OODA Loop complete — {cycle} cycles, {} tasks remaining", remaining.len());
+    info!(
+        "OODA Loop complete — {cycle} cycles, {} tasks remaining",
+        remaining.len()
+    );
 }
 
 fn main() {
@@ -515,8 +713,12 @@ fn main() {
     match args.cmd {
         Cmd::Run { dry_run, project } => {
             let mut cfg = load_config();
-            if dry_run { cfg.dry_run = true; }
-            if let Some(p) = project { cfg.project_dir = p; }
+            if dry_run {
+                cfg.dry_run = true;
+            }
+            if let Some(p) = project {
+                cfg.project_dir = p;
+            }
             ooda_run(cfg);
         }
         Cmd::Status => {
@@ -528,15 +730,29 @@ fn main() {
             println!("{:<15} {:<10} DESCRIPTION", "ID", "STATUS");
             println!("{}", "-".repeat(60));
             for t in &tasks {
-                println!("{:<15} {:<10} {}", t.id, t.status, &t.description[..t.description.len().min(50)]);
+                println!(
+                    "{:<15} {:<10} {}",
+                    t.id,
+                    t.status,
+                    &t.description[..t.description.len().min(50)]
+                );
             }
         }
-        Cmd::Add { description, context } => {
+        Cmd::Add {
+            description,
+            context,
+        } => {
             let path = PathBuf::from("tasks.yaml");
             let text = std::fs::read_to_string(&path).unwrap_or_default();
             let mut raw: Vec<Task> = serde_yaml::from_str(&text).unwrap_or_default();
             let id = format!("task-{}", raw.len() + 1);
-            raw.push(Task { id: id.clone(), description: description.clone(), context: context.unwrap_or_default(), status: "pending".into(), attempts: 0 });
+            raw.push(Task {
+                id: id.clone(),
+                description: description.clone(),
+                context: context.unwrap_or_default(),
+                status: "pending".into(),
+                attempts: 0,
+            });
             let _ = std::fs::write(&path, serde_yaml::to_string(&raw).unwrap());
             println!("Added: {id} — {description}");
         }
