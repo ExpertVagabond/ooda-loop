@@ -561,6 +561,31 @@ fn run_review(diff: &str, task: &Task, constraints: &str, cfg: &Config) -> Revie
     }
 }
 
+// Omega Architecture: SkipFire — only re-observe when codebase has changed
+fn has_project_changed(project_dir: &str) -> bool {
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(project_dir)
+        .output();
+    match output {
+        Ok(o) => !o.stdout.is_empty(),
+        Err(_) => true, // assume changed if we can't check
+    }
+}
+
+// Omega Architecture: Queue metrics (TankBuffer pattern)
+#[derive(Debug, Default)]
+struct QueueMetrics {
+    tasks_out: u64,
+    tasks_completed: u64,
+    tasks_failed: u64,
+    tasks_requeued: u64,
+    tasks_spawned: u64,
+    peak_depth: usize,
+    skip_fire_hits: u64,
+    skip_fire_misses: u64,
+}
+
 // Main loop
 fn ooda_run(cfg: Config) {
     let constraints = load_constraints();
@@ -579,17 +604,36 @@ fn ooda_run(cfg: Config) {
         info!("DRY RUN — no code will be written");
     }
 
+    // Omega Architecture: metrics + skip-fire state
+    let mut metrics = QueueMetrics::default();
+    let mut cached_context: Option<String> = None;
+
     while !tasks.is_empty() && cycle < max_cycles {
         cycle += 1;
+        metrics.peak_depth = metrics.peak_depth.max(tasks.len());
         let mut task = tasks.remove(0);
         task.status = "running".into();
         task.attempts += 1;
+        metrics.tasks_out += 1;
 
         info!("[cycle {cycle}] Task {}: {}", task.id, task.description);
 
-        // OBSERVE
-        info!("  OBSERVE — scanning codebase");
-        let project_context = get_project_context(&cfg.project_dir, 4000);
+        // OBSERVE — with Omega SkipFire (only re-scan when codebase changed)
+        let project_changed = has_project_changed(&cfg.project_dir);
+        let project_context = match (&cached_context, project_changed) {
+            (Some(cached), false) => {
+                metrics.skip_fire_hits += 1;
+                info!("  OBSERVE — skip-fire (no changes since last scan)");
+                cached.clone()
+            }
+            _ => {
+                metrics.skip_fire_misses += 1;
+                info!("  OBSERVE — scanning codebase (changes detected)");
+                let ctx = get_project_context(&cfg.project_dir, 4000);
+                cached_context = Some(ctx.clone());
+                ctx
+            }
+        };
 
         let prompt = format!(
             "## CONSTRAINTS\n{constraints}\n\n## EXISTING CODEBASE\n{project_context}\n\n## TASK\n{}\n\n## CONTEXT\n{}\n\n## INSTRUCTIONS\nImplement this task. Follow all constraints. Write tests if none exist.\nMake minimal, focused changes. Do not refactor unrelated code.\nDo NOT wrap file contents in markdown code fences — output raw code only.",
@@ -626,9 +670,11 @@ fn ooda_run(cfg: Config) {
                 task.context += &format!("\n\nPrevious attempt failed tests:\n{truncated}");
                 task.status = "pending".into();
                 tasks.insert(0, task);
+                metrics.tasks_requeued += 1;
                 continue;
             } else {
                 task.status = "failed".into();
+                metrics.tasks_failed += 1;
                 info!("  Task {} FAILED after {max_attempts} attempts", task.id);
                 save_tasks(&tasks);
                 continue;
@@ -669,6 +715,7 @@ fn ooda_run(cfg: Config) {
 
         if review.approved {
             task.status = "done".into();
+            metrics.tasks_completed += 1;
             if !dry_run {
                 let msg = format!(
                     "ooda: {} — {}",
@@ -687,9 +734,11 @@ fn ooda_run(cfg: Config) {
                 task.id
             );
         } else {
+            let new_count = review.new_tasks.len() as u64;
             for nt in review.new_tasks {
                 tasks.push(nt);
             }
+            metrics.tasks_spawned += new_count;
             info!("  Added {} new tasks from review", review.issues.len());
         }
 
@@ -704,6 +753,21 @@ fn ooda_run(cfg: Config) {
         "OODA Loop complete — {cycle} cycles, {} tasks remaining",
         remaining.len()
     );
+
+    // Omega Architecture: print queue metrics
+    info!(
+        "  Queue: {} processed, {} completed, {} failed, {} requeued, {} spawned (peak depth: {})",
+        metrics.tasks_out, metrics.tasks_completed, metrics.tasks_failed,
+        metrics.tasks_requeued, metrics.tasks_spawned, metrics.peak_depth
+    );
+    let total_sf = metrics.skip_fire_hits + metrics.skip_fire_misses;
+    if total_sf > 0 {
+        info!(
+            "  Observe skip-fire: {}/{} skipped ({:.0}%)",
+            metrics.skip_fire_hits, total_sf,
+            metrics.skip_fire_hits as f64 / total_sf as f64 * 100.0
+        );
+    }
 }
 
 fn main() {
