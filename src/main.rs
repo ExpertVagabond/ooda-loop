@@ -133,6 +133,21 @@ fn root_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// Validate that a project directory path is safe (exists, is a directory, no null bytes).
+fn validate_project_dir(dir: &str) -> Result<PathBuf, String> {
+    if dir.contains('\0') {
+        return Err("project_dir contains null byte".into());
+    }
+    let path = PathBuf::from(dir);
+    if !path.exists() {
+        return Err(format!("project_dir does not exist: {dir}"));
+    }
+    if !path.is_dir() {
+        return Err(format!("project_dir is not a directory: {dir}"));
+    }
+    Ok(path)
+}
+
 fn load_config() -> Config {
     let paths = [PathBuf::from("config.yaml"), root_dir().join("config.yaml")];
     for p in &paths {
@@ -145,6 +160,9 @@ fn load_config() -> Config {
                 cfg.xai_api_key =
                     std::env::var(cfg.xai_api_key.trim_start_matches('$')).unwrap_or_default();
             }
+            // Cap max_cycles to prevent runaway loops
+            cfg.max_cycles = cfg.max_cycles.min(100);
+            cfg.max_attempts_per_task = cfg.max_attempts_per_task.min(10);
             return cfg;
         }
     }
@@ -370,10 +388,26 @@ fn run_coding_agent(prompt: &str, cfg: &Config) -> String {
                 .unwrap_or_default();
 
             let re = Regex::new(r"===FILE:\s*(.+?)===\n([\s\S]*?)===END===").unwrap();
+            let project_canon = std::fs::canonicalize(project_dir)
+                .unwrap_or_else(|_| PathBuf::from(project_dir));
             for cap in re.captures_iter(&response_text) {
                 let rel_path = cap[1].trim();
-                let content = strip_fences(&cap[2]);
+                // Reject paths with traversal or null bytes
+                if rel_path.contains("..") || rel_path.contains('\0') || rel_path.starts_with('/') {
+                    info!("    SKIPPED (unsafe path): {rel_path}");
+                    continue;
+                }
                 let target = Path::new(project_dir).join(rel_path);
+                // Verify resolved path stays within project directory
+                if let Ok(canon) = std::fs::canonicalize(
+                    target.parent().unwrap_or(Path::new(project_dir))
+                ) {
+                    if !canon.starts_with(&project_canon) {
+                        info!("    SKIPPED (path escape): {rel_path}");
+                        continue;
+                    }
+                }
+                let content = strip_fences(&cap[2]);
                 if let Some(parent) = target.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
@@ -383,15 +417,21 @@ fn run_coding_agent(prompt: &str, cfg: &Config) -> String {
             response_text
         }
         "custom" => {
+            // Write prompt to a temp file to avoid shell injection via {prompt}
+            let prompt_file = Path::new(project_dir).join(".ooda-prompt.tmp");
+            let _ = std::fs::write(&prompt_file, prompt);
+            let prompt_path = prompt_file.to_string_lossy().to_string();
             let cmd_str = cfg
                 .coding_agent
                 .command
-                .replace("{prompt}", prompt)
+                .replace("{prompt_file}", &prompt_path)
+                .replace("{prompt}", &prompt.replace('\'', "'\\''"))
                 .replace("{project_dir}", project_dir);
             let out = Command::new("sh")
                 .args(["-c", &cmd_str])
                 .current_dir(project_dir)
                 .output();
+            let _ = std::fs::remove_file(&prompt_file);
             out.map(|o| String::from_utf8_lossy(&o.stdout).to_string())
                 .unwrap_or_default()
         }
@@ -588,6 +628,11 @@ struct QueueMetrics {
 
 // Main loop
 fn ooda_run(cfg: Config) {
+    // Validate project directory before starting
+    if let Err(e) = validate_project_dir(&cfg.project_dir) {
+        info!("Invalid project_dir: {e}");
+        return;
+    }
     let constraints = load_constraints();
     let mut tasks = load_tasks();
     let max_attempts = cfg.max_attempts_per_task;
@@ -817,7 +862,9 @@ fn main() {
                 status: "pending".into(),
                 attempts: 0,
             });
-            let _ = std::fs::write(&path, serde_yaml::to_string(&raw).unwrap());
+            if let Ok(yaml) = serde_yaml::to_string(&raw) {
+                let _ = std::fs::write(&path, yaml);
+            }
             println!("Added: {id} — {description}");
         }
         Cmd::Reset => {
@@ -831,7 +878,9 @@ fn main() {
                     count += 1;
                 }
             }
-            let _ = std::fs::write(&path, serde_yaml::to_string(&raw).unwrap());
+            if let Ok(yaml) = serde_yaml::to_string(&raw) {
+                let _ = std::fs::write(&path, yaml);
+            }
             println!("Reset {count} tasks to pending.");
         }
     }
