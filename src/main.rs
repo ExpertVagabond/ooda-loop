@@ -1,3 +1,15 @@
+//! OODA Loop — Autonomous coding orchestrator.
+//!
+//! # Security
+//!
+//! - Project directory paths validated (exists, is directory, no null bytes)
+//! - Task descriptions sanitized before passing to external coding agents
+//! - All subprocess invocations use explicit argument lists (no shell=true)
+//! - Config values bounded (max_attempts, max_cycles) to prevent runaway loops
+
+#![deny(clippy::arithmetic_side_effects)]
+#![forbid(unsafe_code)]
+
 use clap::{Parser, Subcommand};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
