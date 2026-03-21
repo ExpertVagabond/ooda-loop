@@ -243,7 +243,7 @@ def ollama_warm(endpoint: str, model: str) -> None:
         )
         LOG.info(f"  Model {model} warmed up")
     except Exception as e:
-        LOG.warning(f"  Warm-up failed: {e}")
+        LOG.warning(f"  Warm-up failed: {sanitize_error(e)}")
 
 
 def ollama_fim(endpoint: str, model: str, prefix: str, suffix: str) -> str:
@@ -382,7 +382,7 @@ CRITICAL RULES:
             return "(error)"
         response_text = resp.json().get("response", "")
     except (httpx.ReadTimeout, httpx.ConnectError) as e:
-        LOG.warning(f"  Ollama failed: {e}")
+        LOG.warning(f"  Ollama failed: {sanitize_error(e)}")
         return "(timeout)"
 
     for match in re.finditer(
@@ -813,7 +813,7 @@ def review_ollama(diff: str, task: Task, constraints: str, cfg: dict) -> Review:
         content = resp.json().get("message", {}).get("content", "")
         return _parse_review_json(content)
     except (httpx.ReadTimeout, httpx.ConnectError) as e:
-        LOG.warning(f"  Ollama review timed out: {e}")
+        LOG.warning(f"  Ollama review timed out: {sanitize_error(e)}")
         return Review(approved=True, summary="Review timed out — auto-approved")
 
 
@@ -880,7 +880,7 @@ def review_claude(diff: str, task: Task, constraints: str, cfg: dict) -> Review:
         content = resp.json()["content"][0]["text"]
         return _parse_review_json(content)
     except Exception as e:
-        LOG.warning(f"  Claude review failed: {e} — falling back to ollama")
+        LOG.warning(f"  Claude review failed: {sanitize_error(e)} — falling back to ollama")
         return review_ollama(diff, task, constraints, cfg)
 
 
@@ -973,7 +973,7 @@ Do NOT wrap file contents in markdown code fences — output raw code only."""
             try:
                 agent_output = run_coding_agent(prompt, cfg)
             except Exception as e:
-                LOG.error(f"  Coding agent crashed: {e}")
+                LOG.error(f"  Coding agent crashed: {sanitize_error(e)}")
                 task.status = "failed"
                 save_tasks(tasks)
                 continue
