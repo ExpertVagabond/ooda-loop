@@ -7,6 +7,45 @@ Outer loop: Grok/Ollama reviews the diff, generates new tasks, repeats until don
 
 from __future__ import annotations
 
+# ── Security: Input Validation & Error Sanitization ──
+import os as _os
+import re as _sec_re
+
+# Security constants — frozen at module level
+SEC_MAX_INPUT_LENGTH = 10_000
+SEC_MAX_PATH_LENGTH = 4096
+SEC_MAX_TASK_DESC = 2000
+SEC_DANGEROUS_PATTERNS = _sec_re.compile(r"[;&|`$]")
+SEC_PATH_TRAVERSAL = _sec_re.compile(r"\.\./|\.\.\\")
+
+
+def sanitize_error(err: BaseException | str) -> str:
+    """Strip internal paths and secrets from error messages."""
+    msg = str(err)[:500] if err else "Unknown error"
+    msg = _sec_re.sub(r"/[^\s:]+", "[path]", msg)
+    msg = _sec_re.sub(r"(key|token|secret|password)=\S+", r"\1=[REDACTED]", msg, flags=_sec_re.IGNORECASE)
+    return msg
+
+
+def validate_path(path_str: str) -> str:
+    """Validate a file path — reject traversal attacks and null bytes."""
+    if not isinstance(path_str, str) or len(path_str) > SEC_MAX_PATH_LENGTH:
+        raise ValueError("Invalid path length")
+    if "\0" in path_str:
+        raise ValueError("Null bytes in path")
+    if SEC_PATH_TRAVERSAL.search(path_str):
+        raise ValueError("Path traversal detected")
+    return path_str
+
+
+def sanitize_input(text: str, max_len: int = SEC_MAX_INPUT_LENGTH) -> str:
+    """Sanitize user input — strip dangerous shell characters."""
+    if not isinstance(text, str):
+        return ""
+    return SEC_DANGEROUS_PATTERNS.sub("", text[:max_len])
+
+
+# ── Standard imports ──
 import argparse
 import json
 import logging
