@@ -1079,7 +1079,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     if args.dry_run:
         cfg["dry_run"] = True
     if args.project:
-        cfg["project_dir"] = args.project
+        cfg["project_dir"] = validate_path(args.project)
     run(cfg)
 
 
@@ -1095,19 +1095,21 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 
 def cmd_add(args: argparse.Namespace) -> None:
+    description = sanitize_input(args.description, SEC_MAX_TASK_DESC)
+    context = sanitize_input(args.context or "", SEC_MAX_TASK_DESC)
     path = ROOT / "tasks.yaml"
     with open(path) as f:
         raw = yaml.safe_load(f) or []
     task_id = f"task-{len(raw) + 1}"
     raw.append({
         "id": task_id,
-        "description": args.description,
-        "context": args.context or "",
+        "description": description,
+        "context": context,
         "status": "pending",
     })
     with open(path, "w") as f:
         yaml.dump(raw, f, default_flow_style=False)
-    print(f"Added: {task_id} — {args.description}")
+    print(f"Added: {task_id} — {description}")
 
 
 def cmd_reset(args: argparse.Namespace) -> None:
@@ -1174,7 +1176,11 @@ examples:
         ],
     )
     LOG.info(f"Log file: {log_file}")
-    args.func(args)
+    try:
+        args.func(args)
+    except Exception as exc:
+        LOG.error(f"Fatal: {sanitize_error(exc)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
